@@ -8,6 +8,8 @@ Get financial decisions (like credit scores) without revealing your financial da
 
 ---
 
+live url - https://sealmll.vercel.app/
+
 ## What Is SealedML?
 
 SealedML is a **privacy-preserving on-chain AI inference protocol** that enables users to receive credit scores and risk assessments **without revealing their sensitive financial data to anyone**.
