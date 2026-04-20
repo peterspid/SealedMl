@@ -1,0 +1,21 @@
+{
+  "name": "sealedml",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "contracts"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter=web dev",
+    "build": "pnpm --filter=web build",
+    "test": "pnpm --filter=contracts test",
+    "deploy:sepolia": "pnpm --filter=contracts deploy:sepolia",
+    "deploy:arb-sepolia": "pnpm --filter=contracts deploy:arb-sepolia"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

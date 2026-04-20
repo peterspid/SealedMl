@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:cofhe-docs.fhenix.zone)",
+      "WebFetch(domain:github.com)",
+      "Bash(mkdir *)",
+      "Bash(pnpm install *)",
+      "Bash(npm install *)",
+      "Bash(npm view *)",
+      "Bash(npm search *)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(node -e \"require\\('fs'\\).readFileSync\\('/c/Users/parth/Desktop/SealedMl/sealedml/apps/web/src/app/about/page.tsx', 'utf8'\\)\")",
+      "Bash(pnpm --filter contracts compile)",
+      "Bash(npm --filter contracts compile)",
+      "Bash(npx hardhat *)",
+      "Bash(PRIVATE_KEY=0x1b59287d686da03c68c12fcc49147597d33725524b15958879c4f76f45f84178 npx hardhat run --network ethereumSepolia -c 'console.log\\(\"Balance check\"\\)')",
+      "Bash(npx ts-node *)"
+    ]
+  }
+}
