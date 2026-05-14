@@ -131,50 +131,35 @@ That's HUGE.
 
 ---
 
-## Advanced Features Roadmap
+## Product Capabilities Delivered
 
-### 🏦 Lender Dashboard (Wave 3 MVP, Wave 4 Expansion)
+### Private Assessment
 
-- B2B interface for banks and lenders is available at `/lenders`
-- Verify user-shared result records
-- Decrypt score and risk handles after the user grants wallet access
-- Next: institution authentication and verification request workflow
-- **Why:** B2B use case = real revenue
+- Users enter six financial signals in the browser
+- Inputs are encrypted locally with `@cofhe/sdk`
+- The deployed contract runs the risk model on encrypted values
+- Final scores are displayed only after wallet-side CoFHE decryption
 
-### 🧠 Explainability (Wave 3)
+### On-Chain Result Management
 
-- "Why did I get this score?"
-- Precomputed logic explanations
-- Encrypted feature importance
-- **Why:** Makes AI trustworthy
+- Every completed inference stores encrypted score and risk handles
+- Result metadata is recorded in `ResultManager`
+- Result history is persisted locally for the connected browser
+- Revocation, expiry, and permission checks are covered by contract tests
 
-### 🔄 Multiple Models (Wave 3-4)
+### Selective Sharing
 
-- Credit score model
-- Fraud detection model
-- Risk assessment model
-- **Why:** Platform, not just one tool
+- Users grant access through `SealedMLInference.grantResultAccess`
+- CoFHE `FHE.allow` grants the recipient wallet decrypt access to the encrypted handles
+- Lenders verify shared request IDs from `/lenders`
+- The lender dashboard shows decrypted output only when CoFHE permits and ACL allow it
 
-### 🧬 Reputation System (Wave 5)
+### Production Deployment
 
-- User builds private financial identity
-- Historical score tracking
-- Private credit history
-- **Why:** Web3 version of CIBIL score
-
-### 📡 Event & Analytics Layer (Wave 4)
-
-- Track usage statistics
-- Public model metrics
-- Zero privacy breach
-- **Why:** Improves UX without breaking privacy
-
-### 🌐 Private AI Marketplace (Wave 5)
-
-- Upload and run private models
-- Model versioning
-- Community models
-- **Why:** Platform expansion
+- Contracts are deployed on Ethereum Sepolia
+- Frontend is deployed on Vercel
+- Production env vars point at the current Sepolia deployment
+- README and frontend env examples include the live deployment details
 
 ---
 
@@ -271,121 +256,62 @@ Final score is floored, capped to 0-100, and classified on-chain.
 
 ## WaveHack Progress
 
-### Wave 1 (Completed) ✅
+### Wave 1 (Done) ✅
 
-- Architecture design
-- Smart contract development (4 contracts)
-- FHE integration patterns
-- Frontend with Next.js 16
-- Wallet connection (wagmi)
-- Interactive feature forms
-- Result display with risk classification
-- Sharing feature with permits
-- Dashboard page with history
-- Models transparency page
-- Professional Sky Blue UI
-- Multi-page navigation
-- Zustand state management
+- Designed the SealedML architecture and privacy-preserving credit scoring flow
+- Built the initial smart contract set: `ModelRegistry`, `SealedMLInference`, `ResultManager`, and `AccessControl`
+- Created the Next.js frontend shell with home, dashboard, models, and about pages
+- Added wallet connection with wagmi and viem
+- Built the interactive six-feature assessment form
+- Added result cards, dashboard history, and model transparency views
+- Added the initial Tailwind UI system and Zustand state store
 
-### Wave 2 (Completed) ✅
+### Wave 2 (Done) ✅
 
-- Deploy to Ethereum Sepolia testnet
-- All 4 contracts deployed and verified
-- Model initialized with v1.1 weights [-2, -3, 6, -2, -2, -1]
-- Contract integration in frontend
-- Transaction handling with wagmi
-- Error handling and user feedback
-- Loading states and progress indicators
-- Network detection and switching
-- Real on-chain inference execution
-- Encrypted result handles from contract
-- Result history persistence
-- Deployment scripts with plain Hardhat/Ethers
+- Deployed the first Ethereum Sepolia contract set
+- Connected the frontend to live testnet contract addresses
+- Added transaction submission, confirmation handling, and explorer links
+- Added network detection and Sepolia switching
+- Stored encrypted score and risk handles from on-chain inference
+- Added local result history persistence
+- Added loading, error, and transaction progress states
+- Replaced old deployment helpers with a single Hardhat/Ethers deployment script
 
-### Wave 3 - Marathon (Completed) ✅
+### Wave 3 (Done) ✅
 
-**Timeline:** April 8 - May 8
+- Integrated real CoFHE browser encryption through `@cofhe/sdk`
+- Sent verifier-signed encrypted `InEuint8` inputs to the inference contract
+- Added wallet permit creation for owner decrypt-to-view
+- Displayed final scores only from decrypted on-chain handles
+- Added decryption failure states with no plaintext fallback
+- Registered active model metadata and feature schema on-chain
+- Added bounded encrypted scoring to prevent unsigned underflow
+- Added `/lenders` for permissioned result verification
 
-**Goals:** Production-ready FHE integration
+### Wave 4 (Done) ✅
 
-#### Core Features
+- Replaced the saturated model with v1.1 risk scoring weights and thresholds
+- Added encrypted feature capping on-chain for the published 0-100 schema
+- Moved sharing to `SealedMLInference.grantResultAccess` so CoFHE `FHE.allow` is granted correctly
+- Blocked direct ResultManager-only grants that could imply false decrypt access
+- Fixed unsupported-chain fallback and undeployed-chain UI states
+- Added lender-side shared-handle decrypt flow and honest CoFHE failure handling
+- Added contract tests for scoring, caps, sharing, expiry, revocation, and fake grant rejection
+- Redeployed the fixed contracts to Ethereum Sepolia
+- Deployed the frontend to Vercel at [https://sealedml.vercel.app](https://sealedml.vercel.app)
 
-- **Real CoFHE Encryption** - Client-side ZK-proof encryption
-  - Integrated `@cofhe/sdk` for encrypted `InEuint8` inputs
-  - ZK proof generation handled by the CoFHE client SDK
-  - Production CoFHE testnet communication on Sepolia
-  - **Full Decryption Flow**
-  - Self-permit creation and validation
-  - Off-chain decrypt-to-view via the CoFHE threshold network
-  - Client-side result display
-  - **Enhanced Visualization**
-  - Real-time encryption and transaction progress UI
-  - Decryption status indicators
-  - FHE handle visibility for verification
-  - **Model Versioning**
-  - Active v1.1.0 model registered on-chain
-  - Model metadata and feature schema visible in the app
-  - Result sharing and lender decrypt verification flow added
+### Wave 5 (Remaining / Future) 📋
 
-#### Technical Requirements
-
-- `@cofhe/sdk` full integration
-- Web Worker/ZK proof flow through the SDK
-- Permit management system
-- Threshold network integration
-- Error recovery for decryption
-- Bounded encrypted scoring to avoid unsigned underflow
-
-### Wave 4 (Planned) 📋
-
-**Timeline:** May 11 - May 20
-
-**Goals:** B2B features and platform expansion
-
-#### Features
-
-- **Lender Dashboard**
-  - B2B interface for financial institutions
-  - Score verification requests
-  - Shared result management
-  - Institution authentication
-- **Batch Inference**
-  - Multiple assessments in one transaction
-  - Batch result retrieval
-  - Cost optimization
-- **Model Marketplace**
-  - Community model submissions
-  - Model ratings and reviews
-  - Governance for model approval
-- **Analytics Layer**
-  - Public model usage statistics
-  - System health monitoring
-  - Performance metrics
-
-### Wave 5 (Planned) 📋
-
-**Timeline:** May 23 - June 5
-
-**Goals:** Mainnet and production
-
-#### Features
-
-- **Multi-chain Deployment**
-  - Fhenix mainnet
-  - Arbitrum One
-  - Ethereum mainnet
-- **Security Audit**
-  - Professional smart contract audit
-  - Frontend security review
-  - Penetration testing
-- **Documentation**
-  - Developer API docs
-  - Integration guides
-  - User documentation
-- **Reputation System**
-  - Private financial identity
-  - Historical score tracking
-  - Identity aggregation
+- Professional smart contract and frontend security audit
+- Mainnet deployment planning and production launch checklist
+- Additional production chains beyond Ethereum Sepolia
+- Institution authentication for lender workflows
+- Batch inference and batch verification
+- Multiple model families, including fraud detection and risk assessment models
+- Private reputation history and cross-chain identity
+- Analytics layer for usage and health metrics without privacy leakage
+- Private AI marketplace and governance for community models
+- B2B API, webhooks, and integration documentation
 
 ---
 
@@ -540,7 +466,7 @@ NEXT_PUBLIC_ACCESS_CONTROL_ETH=0x...
 
 ## Future Vision
 
-### Wave 5+ Roadmap
+### Wave 5 Roadmap
 
 1. **🌐 Private AI Marketplace**
   - Upload and run private models
@@ -600,7 +526,7 @@ MIT
 | **How?**             | FHE encryption + on-chain computation               |
 | **Who benefits?**    | Users, DeFi protocols, institutions                 |
 | **Tech?**            | Fhenix, Solidity, Next.js                           |
-| **Status?**          | Wave 3 complete; production testnet MVP live        |
+| **Status?**          | Wave 4 done; production testnet MVP live            |
 | **Testnet?**         | ✅ Deployed on Ethereum Sepolia                      |
 
 
