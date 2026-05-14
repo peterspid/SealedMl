@@ -1,6 +1,3 @@
-'use client';
-
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { cn } from '@/lib/utils';
@@ -8,21 +5,11 @@ import {
   Shield,
   Brain,
   BarChart3,
-  Lock,
   CheckCircle,
-  Layers,
-  TrendingUp,
-  ArrowRight,
   Database,
 } from 'lucide-react';
 
 export default function ModelsPage() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const models = [
     {
       id: 1,
@@ -37,28 +24,6 @@ export default function ModelsPage() {
       ],
       status: 'Active',
       icon: BarChart3,
-    },
-    {
-      id: 2,
-      name: 'Fraud Detection',
-      version: 'Coming Soon',
-      description: 'Detect fraudulent transactions and activities without revealing transaction patterns.',
-      features: ['Transaction Amount', 'Frequency', 'Location Patterns', 'Behavior Anomalies'],
-      riskLevels: [],
-      status: 'Coming Soon',
-      icon: Shield,
-      disabled: true,
-    },
-    {
-      id: 3,
-      name: 'Financial Reputation',
-      version: 'Coming Soon',
-      description: 'Build a private financial identity score based on on-chain and off-chain behavior.',
-      features: ['Payment History', 'Asset Management', 'Debt Utilization', 'Account Age'],
-      riskLevels: [],
-      status: 'Coming Soon',
-      icon: TrendingUp,
-      disabled: true,
     },
   ];
 
@@ -82,28 +47,24 @@ export default function ModelsPage() {
               key={model.id}
               className={cn(
                 "rounded-2xl border p-6 transition-all duration-300",
-                model.disabled
-                  ? "border-dark-700/50 bg-dark-900/30 opacity-60"
-                  : "border-sky-500/20 bg-dark-900/50 card-hover",
-                mounted ? "animate-fade-in-up" : "opacity-0"
+                "border-sky-500/20 bg-dark-900/50 card-hover",
+                "animate-fade-in-up"
               )}
               style={{ transitionDelay: `${i * 100}ms` }}
             >
               {/* Icon */}
               <div className={cn(
                 "w-14 h-14 rounded-xl flex items-center justify-center mb-4",
-                model.disabled ? "bg-dark-700" : "bg-sky-500/20"
+                "bg-sky-500/20"
               )}>
-                <model.icon className={cn("w-7 h-7", model.disabled ? "text-dark-500" : "text-sky-400")} />
+                <model.icon className="w-7 h-7 text-sky-400" />
               </div>
 
               {/* Status Badge */}
               <div className="flex items-center justify-between mb-3">
                 <span className={cn(
                   "px-2 py-1 rounded text-xs font-medium",
-                  model.status === 'Active'
-                    ? "bg-emerald-500/20 text-emerald-400"
-                    : "bg-dark-700 text-dark-400"
+                  "bg-emerald-500/20 text-emerald-400"
                 )}>
                   {model.status}
                 </span>
@@ -113,7 +74,7 @@ export default function ModelsPage() {
               {/* Title */}
               <h3 className={cn(
                 "text-xl font-bold mb-2",
-                model.disabled ? "text-dark-400" : "text-white"
+                "text-white"
               )}>
                 {model.name}
               </h3>
@@ -132,7 +93,7 @@ export default function ModelsPage() {
                       key={feature}
                       className={cn(
                         "px-2 py-1 rounded text-xs",
-                        model.disabled ? "bg-dark-700 text-dark-500" : "bg-sky-500/10 text-sky-400"
+                        "bg-sky-500/10 text-sky-400"
                       )}
                     >
                       {feature}
@@ -163,20 +124,13 @@ export default function ModelsPage() {
               )}
 
               {/* Action */}
-              {!model.disabled ? (
-                <Link
-                  href="/dashboard"
-                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-sky-600 text-white font-semibold shadow-lg shadow-sky-500/20 hover:from-sky-400 hover:to-sky-500 transition-all"
-                >
-                  <Brain className="w-4 h-4" />
-                  <span>Use Model</span>
-                </Link>
-              ) : (
-                <div className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-dark-700 text-dark-500 font-medium">
-                  <Lock className="w-4 h-4" />
-                  <span>Coming Soon</span>
-                </div>
-              )}
+              <Link
+                href="/dashboard"
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-sky-600 text-white font-semibold shadow-lg shadow-sky-500/20 hover:from-sky-400 hover:to-sky-500 transition-all"
+              >
+                <Brain className="w-4 h-4" />
+                <span>Use Model</span>
+              </Link>
             </div>
           ))}
         </div>

@@ -5,9 +5,9 @@
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
-    "deploy:sepolia": "hardhat deploy --network ethereumSepolia",
-    "deploy:arb-sepolia": "hardhat deploy --network arbitrumSepolia",
-    "deploy:base-sepolia": "hardhat deploy --network baseSepolia",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network ethereumSepolia",
+    "deploy:arb-sepolia": "hardhat run scripts/deploy.ts --network arbitrumSepolia",
+    "deploy:base-sepolia": "hardhat run scripts/deploy.ts --network baseSepolia",
     "node": "hardhat node",
     "clean": "hardhat clean"
   },
@@ -16,6 +16,8 @@
     "@openzeppelin/contracts": "^5.0.2"
   },
   "devDependencies": {
+    "@cofhe/hardhat-plugin": "^0.5.2",
+    "@cofhe/mock-contracts": "^0.5.2",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.6",
     "@nomicfoundation/hardhat-ethers": "^3.0.5",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
@@ -29,7 +31,6 @@
     "dotenv": "^16.4.5",
     "ethers": "^6.13.0",
     "hardhat": "^2.22.4",
-    "hardhat-deploy": "^0.11.45",
     "hardhat-gas-reporter": "^1.0.10",
     "solidity-coverage": "^0.8.12",
     "ts-node": "^10.9.2",

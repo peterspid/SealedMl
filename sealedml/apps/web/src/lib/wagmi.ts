@@ -1,12 +1,13 @@
-import { http, createConfig, createStorage } from 'wagmi';
+import { http, createConfig, createStorage, injected } from 'wagmi';
 import { sepolia, arbitrumSepolia, baseSepolia } from 'wagmi/chains';
-import { injected } from 'wagmi/connectors';
+
+const connectors = [
+  injected({ shimDisconnect: true }),
+];
 
 export const config = createConfig({
   chains: [sepolia, arbitrumSepolia, baseSepolia],
-  connectors: [
-    injected(),
-  ],
+  connectors,
   transports: {
     [sepolia.id]: http(),
     [arbitrumSepolia.id]: http(),

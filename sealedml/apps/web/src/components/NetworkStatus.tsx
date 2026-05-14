@@ -1,24 +1,45 @@
 'use client';
 
-import { useAccount } from 'wagmi';
-import { CheckCircle, AlertCircle } from 'lucide-react';
+import { useAccount, useSwitchChain } from 'wagmi';
+import { sepolia } from 'wagmi/chains';
+import { useHydrated } from '@/hooks/useHydrated';
+import { getConfiguredChainIds } from '@/lib/contracts';
+import { AlertCircle, CheckCircle, Wifi } from 'lucide-react';
+
+const configuredChainIds = new Set(getConfiguredChainIds());
 
 export function NetworkStatus() {
+  const hydrated = useHydrated();
   const { isConnected, chain } = useAccount();
+  const { switchChain, isPending } = useSwitchChain();
 
-  if (!isConnected) {
+  if (!hydrated || !isConnected) {
     return (
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-dark-800 border border-dark-700">
-        <AlertCircle className="w-4 h-4 text-amber-400" />
-        <span className="text-xs text-amber-400">Not Connected</span>
+      <div className="inline-flex items-center gap-2 rounded-md border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-400">
+        <Wifi className="h-3.5 w-3.5" />
+        Wallet not connected
       </div>
     );
   }
 
+  if (!chain || !configuredChainIds.has(chain.id)) {
+    return (
+      <button
+        type="button"
+        onClick={() => switchChain({ chainId: sepolia.id })}
+        disabled={isPending}
+        className="inline-flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs font-medium text-amber-100 transition hover:bg-amber-400/15 disabled:opacity-60"
+      >
+        <AlertCircle className="h-3.5 w-3.5" />
+        Switch to Sepolia
+      </button>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
-      <CheckCircle className="w-4 h-4 text-emerald-400" />
-      <span className="text-xs text-emerald-400">{chain?.name || 'Connected'}</span>
+    <div className="inline-flex items-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-medium text-emerald-100">
+      <CheckCircle className="h-3.5 w-3.5" />
+      {chain.name}
     </div>
   );
 }

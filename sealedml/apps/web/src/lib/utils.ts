@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { encodePacked, keccak256 } from 'viem';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -20,16 +21,14 @@ export function formatTimestamp(timestamp: number): string {
   });
 }
 
-export function generateRequestId(address: string, nonce: number): string {
-  const timestamp = Date.now();
-  const data = `${address}-${nonce}-${timestamp}`;
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) {
-    const char = data.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return `0x${Math.abs(hash).toString(16).padStart(64, '0')}`;
+export function generateRequestId(address: string): `0x${string}` {
+  const random = crypto.getRandomValues(new Uint32Array(4));
+  return keccak256(
+    encodePacked(
+      ['address', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256'],
+      [address as `0x${string}`, BigInt(Date.now()), BigInt(random[0]), BigInt(random[1]), BigInt(random[2]), BigInt(random[3])]
+    )
+  );
 }
 
 export function sleep(ms: number): Promise<void> {

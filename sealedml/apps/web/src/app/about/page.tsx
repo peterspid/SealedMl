@@ -1,6 +1,3 @@
-'use client';
-
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { cn } from '@/lib/utils';
@@ -22,12 +19,6 @@ import {
 } from 'lucide-react';
 
 export default function AboutPage() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const techStack = [
     { name: 'Fhenix FHE', desc: 'Fully Homomorphic Encryption', icon: Lock },
     { name: 'Solidity', desc: 'Smart Contracts', icon: Code },
@@ -105,14 +96,14 @@ export default function AboutPage() {
         <div className="text-center mb-16">
           <h1 className={cn(
             "text-4xl sm:text-5xl font-bold mb-4",
-            mounted ? "animate-fade-in-up" : "opacity-0"
+            "animate-fade-in-up"
           )}>
             <span className="text-white">About </span>
             <span className="gradient-text">SealedML</span>
           </h1>
           <p className={cn(
             "text-xl text-dark-400 max-w-2xl mx-auto",
-            mounted ? "animate-fade-in-up delay-100" : "opacity-0"
+            "animate-fade-in-up delay-100"
           )}>
             Privacy-First AI Inference on the Blockchain
           </p>
@@ -121,7 +112,7 @@ export default function AboutPage() {
         <section className="mb-20">
           <div className={cn(
             "p-8 rounded-2xl border border-sky-500/20 bg-dark-900/50",
-            mounted ? "animate-fade-in-up" : "opacity-0"
+            "animate-fade-in-up"
           )}>
             <div className="flex items-start gap-6">
               <div className="w-16 h-16 rounded-2xl bg-sky-500/20 flex items-center justify-center flex-shrink-0">
@@ -130,7 +121,7 @@ export default function AboutPage() {
               <div>
                 <h2 className="text-2xl font-bold text-white mb-4">What is SealedML?</h2>
                 <p className="text-dark-300 mb-4">
-                  <strong className="text-sky-400">SealedML = "AI that works on your data without seeing your data"</strong>
+                  <strong className="text-sky-400">SealedML = &quot;AI that works on your data without seeing your data&quot;</strong>
                 </p>
                 <p className="text-dark-400 mb-4">
                   SealedML is a privacy-preserving on-chain AI inference protocol that enables users to receive credit scores and risk assessments <strong className="text-white">without revealing their sensitive financial data to anyone</strong>.
@@ -146,7 +137,7 @@ export default function AboutPage() {
         <section className="mb-20">
           <h2 className={cn(
             "text-3xl font-bold text-white mb-8 text-center",
-            mounted ? "animate-fade-in-up" : "opacity-0"
+            "animate-fade-in-up"
           )}>
             How It Works
           </h2>
@@ -157,7 +148,7 @@ export default function AboutPage() {
                 key={i}
                 className={cn(
                   "p-6 rounded-xl border border-sky-500/10 bg-dark-900/30",
-                  mounted ? "animate-fade-in-up" : "opacity-0"
+                  "animate-fade-in-up"
                 )}
                 style={{ transitionDelay: `${i * 100}ms` }}
               >
@@ -177,7 +168,7 @@ export default function AboutPage() {
         <section className="mb-20">
           <h2 className={cn(
             "text-3xl font-bold text-white mb-8 text-center",
-            mounted ? "animate-fade-in-up" : "opacity-0"
+            "animate-fade-in-up"
           )}>
             Why SealedML?
           </h2>
@@ -185,7 +176,7 @@ export default function AboutPage() {
           <div className="grid md:grid-cols-2 gap-8">
             <div className={cn(
               "p-6 rounded-xl bg-red-500/5 border border-red-500/20",
-              mounted ? "animate-fade-in-up delay-100" : "opacity-0"
+              "animate-fade-in-up delay-100"
             )}>
               <h3 className="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
                 <span className="text-xl">X</span> Traditional AI
@@ -212,7 +203,7 @@ export default function AboutPage() {
 
             <div className={cn(
               "p-6 rounded-xl bg-emerald-500/5 border border-emerald-500/20",
-              mounted ? "animate-fade-in-up delay-200" : "opacity-0"
+              "animate-fade-in-up delay-200"
             )}>
               <h3 className="text-lg font-semibold text-emerald-400 mb-4 flex items-center gap-2">
                 <CheckCircle className="w-5 h-5" /> SealedML
@@ -242,7 +233,7 @@ export default function AboutPage() {
         <section className="mb-20">
           <h2 className={cn(
             "text-3xl font-bold text-white mb-8 text-center",
-            mounted ? "animate-fade-in-up" : "opacity-0"
+            "animate-fade-in-up"
           )}>
             Built With
           </h2>
@@ -253,7 +244,7 @@ export default function AboutPage() {
                 key={i}
                 className={cn(
                   "p-4 rounded-xl border border-sky-500/10 bg-dark-900/30 text-center",
-                  mounted ? "animate-fade-in-up" : "opacity-0"
+                  "animate-fade-in-up"
                 )}
                 style={{ transitionDelay: `${i * 50}ms` }}
               >
@@ -268,7 +259,7 @@ export default function AboutPage() {
         <section className="mb-20">
           <h2 className={cn(
             "text-3xl font-bold text-white mb-8 text-center",
-            mounted ? "animate-fade-in-up" : "opacity-0"
+            "animate-fade-in-up"
           )}>
             Credits
           </h2>
@@ -279,7 +270,7 @@ export default function AboutPage() {
                 key={i}
                 className={cn(
                   "p-6 rounded-xl border border-sky-500/20 bg-dark-900/50 text-center",
-                  mounted ? "animate-fade-in-up" : "opacity-0"
+                  "animate-fade-in-up"
                 )}
                 style={{ transitionDelay: `${i * 100}ms` }}
               >
@@ -295,7 +286,7 @@ export default function AboutPage() {
         <section className="mb-8">
           <div className={cn(
             "text-center p-8 rounded-2xl border border-sky-500/20 bg-gradient-to-r from-sky-500/10 to-transparent",
-            mounted ? "animate-fade-in-up" : "opacity-0"
+            "animate-fade-in-up"
           )}>
             <h2 className="text-2xl font-bold text-white mb-4">Ready to Try?</h2>
             <p className="text-dark-400 mb-6 max-w-md mx-auto">

@@ -1,136 +1,189 @@
 'use client';
 
-import { cn } from '@/lib/utils';
-import { formatTimestamp } from '@/lib/utils';
-import { getRiskColor, getRiskLabel } from '@/lib/utils';
-import { Lock, Shield, AlertTriangle, CheckCircle, Share2, Copy, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
+import { cn, formatTimestamp, getRiskColor, getRiskLabel } from '@/lib/utils';
+import { getExplorerTxUrl } from '@/lib/contracts';
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle,
+  Copy,
+  ExternalLink,
+  Lock,
+  Share2,
+  Shield,
+} from 'lucide-react';
 
 interface ResultCardProps {
   requestId: string;
-  riskClass: number;
-  score: number;
+  riskClass: number | null;
+  score: number | null;
   timestamp: number;
+  txHash?: `0x${string}`;
+  chainId?: number;
+  encryptedScoreHandle?: string;
+  encryptedRiskClassHandle?: string;
+  decryptionStatus?: 'decrypted' | 'pending' | 'failed';
   onShare?: () => void;
 }
 
-export function ResultCard({ requestId, riskClass, score, timestamp, onShare }: ResultCardProps) {
-  const colors = getRiskColor(riskClass);
-  const label = getRiskLabel(riskClass);
+export function ResultCard({
+  requestId,
+  riskClass,
+  score,
+  timestamp,
+  txHash,
+  chainId,
+  encryptedScoreHandle,
+  encryptedRiskClassHandle,
+  decryptionStatus = 'decrypted',
+  onShare,
+}: ResultCardProps) {
+  const [copied, setCopied] = useState(false);
+  const hasDecryptedScore = decryptionStatus === 'decrypted' && score !== null && riskClass !== null;
+  const colors = hasDecryptedScore ? getRiskColor(riskClass) : {
+    bg: 'bg-cyan-400/10',
+    text: 'text-cyan-200',
+    border: 'border-cyan-400/30',
+  };
+  const label = hasDecryptedScore ? getRiskLabel(riskClass) : 'Encrypted result confirmed';
+  const RiskIcon = hasDecryptedScore ? (riskClass === 0 ? CheckCircle : AlertTriangle) : Lock;
+  const txUrl = getExplorerTxUrl(chainId, txHash);
 
-  const RiskIcon = riskClass === 0 ? CheckCircle : AlertTriangle;
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(requestId);
+  const copyToClipboard = async (value: string) => {
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
   };
 
   return (
-    <div className={cn(
-      'rounded-2xl border p-6 bg-dark-900/80 backdrop-blur-sm',
-      'border-sky-500/20',
-      'animate-fade-in-up'
-    )}>
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+    <div className="rounded-lg border border-slate-700/80 bg-slate-950/85 p-5 shadow-2xl shadow-black/30">
+      <div className="mb-5 flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className={cn(
-            'w-12 h-12 rounded-xl flex items-center justify-center',
-            colors.bg
-          )}>
-            <RiskIcon className={cn('w-6 h-6', colors.text)} />
+          <div className={cn('flex h-11 w-11 items-center justify-center rounded-lg', colors.bg)}>
+            <RiskIcon className={cn('h-5 w-5', colors.text)} />
           </div>
           <div>
-            <h3 className={cn('text-xl font-bold', colors.text)}>{label}</h3>
-            <p className="text-sm text-dark-500">Risk Classification</p>
+            <h3 className={cn('text-lg font-semibold', colors.text)}>{label}</h3>
+            <p className="text-xs text-slate-400">
+              {hasDecryptedScore ? 'Private risk classification' : 'Awaiting wallet-side decryption'}
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-sky-400">
-          <Lock className="w-4 h-4" />
-          <span className="text-xs font-medium">Encrypted</span>
-        </div>
-      </div>
-
-      {/* Score */}
-      <div className="text-center py-8 mb-6 rounded-xl bg-dark-800/50">
-        <p className="text-sm text-dark-400 mb-2">Your Credit Score</p>
-        <div className="flex items-baseline justify-center gap-1">
-          <span className={cn('text-6xl font-bold font-mono', colors.text)}>
-            {score.toFixed(1)}
+        <div className="flex items-center gap-2 rounded-md border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-cyan-200">
+          <Lock className="h-3.5 w-3.5" />
+          <span className="text-xs font-medium">
+            {decryptionStatus === 'decrypted' ? 'Decrypted locally' : 'Encrypted handle saved'}
           </span>
-          <span className="text-2xl text-dark-500">/100</span>
-        </div>
-
-        {/* Score bar */}
-        <div className="mt-4 mx-auto max-w-xs">
-          <div className="h-2 rounded-full bg-dark-700 overflow-hidden">
-            <div
-              className={cn('h-full rounded-full transition-all duration-1000', colors.bg.replace('/20', ''))}
-              style={{ width: `${score}%` }}
-            />
-          </div>
-          <div className="flex justify-between mt-2 text-xs text-dark-500">
-            <span>0</span>
-            <span>70</span>
-            <span>85</span>
-            <span>100</span>
-          </div>
         </div>
       </div>
 
-      {/* Request ID */}
-      <div className="mb-6">
-        <p className="text-xs text-dark-500 mb-1">Request ID</p>
-        <div className="flex items-center gap-2">
-          <code className="flex-1 text-xs text-dark-400 bg-dark-800 px-3 py-2 rounded-lg truncate">
-            {requestId.slice(0, 20)}...{requestId.slice(-8)}
-          </code>
-          <button
-            onClick={copyToClipboard}
-            className="p-2 rounded-lg bg-dark-800 hover:bg-dark-700 transition-colors"
-          >
-            <Copy className="w-4 h-4 text-dark-400" />
-          </button>
-        </div>
+      <div className="mb-5 rounded-lg border border-slate-800 bg-slate-900/70 px-5 py-6 text-center">
+        {hasDecryptedScore ? (
+          <>
+            <p className="mb-2 text-xs uppercase tracking-[0.16em] text-slate-500">Credit risk score</p>
+            <div className="flex items-baseline justify-center gap-1">
+              <span className={cn('font-mono text-5xl font-bold', colors.text)}>
+                {score.toFixed(0)}
+              </span>
+              <span className="text-xl text-slate-500">/100</span>
+            </div>
+            <div className="mx-auto mt-4 max-w-xs">
+              <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all duration-700',
+                    riskClass === 0 ? 'bg-emerald-400' : riskClass === 1 ? 'bg-amber-400' : 'bg-red-400'
+                  )}
+                  style={{ width: `${Math.max(3, Math.min(100, score))}%` }}
+                />
+              </div>
+              <div className="mt-2 flex justify-between text-[11px] text-slate-500">
+                <span>0</span>
+                <span>40</span>
+                <span>70</span>
+                <span>100</span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="mx-auto max-w-sm py-2">
+            <Lock className="mx-auto mb-3 h-8 w-8 text-cyan-300" />
+            <p className="text-lg font-semibold text-white">No plaintext score displayed</p>
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              The transaction is confirmed and encrypted handles are stored on-chain. Reconnect your wallet permit to decrypt the score.
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Timestamp */}
-      <div className="flex items-center justify-between text-sm text-dark-400 mb-6">
+      {decryptionStatus === 'failed' && (
+        <div className="mb-5 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+          The testnet transaction is confirmed, but no fallback score is shown. Only decrypted on-chain output is displayed as a score.
+        </div>
+      )}
+
+      <div className="mb-5 space-y-3">
+        <div>
+          <p className="mb-1 text-xs text-slate-500">Request ID</p>
+          <div className="flex items-center gap-2">
+            <code className="min-w-0 flex-1 truncate rounded-md bg-slate-900 px-3 py-2 text-xs text-slate-300">
+              {requestId}
+            </code>
+            <button
+              type="button"
+              onClick={() => copyToClipboard(requestId)}
+              className="rounded-md border border-slate-700 bg-slate-900 p-2 text-slate-300 transition hover:border-cyan-400/50 hover:text-white"
+              aria-label="Copy request ID"
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+
+        {(encryptedScoreHandle || encryptedRiskClassHandle) && (
+          <div className="grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
+            <div className="rounded-md border border-slate-800 bg-slate-900/70 p-2">
+              <span className="block text-slate-400">Score handle</span>
+              <span className="block truncate">{encryptedScoreHandle}</span>
+            </div>
+            <div className="rounded-md border border-slate-800 bg-slate-900/70 p-2">
+              <span className="block text-slate-400">Risk handle</span>
+              <span className="block truncate">{encryptedRiskClassHandle}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mb-5 flex items-center justify-between text-sm text-slate-400">
         <div className="flex items-center gap-2">
-          <Shield className="w-4 h-4" />
-          <span>Verified on-chain</span>
+          <Shield className="h-4 w-4 text-cyan-300" />
+          <span>Recorded on-chain</span>
         </div>
         <span>{formatTimestamp(timestamp)}</span>
       </div>
 
-      {/* Actions */}
       <div className="flex gap-3">
         <button
+          type="button"
           onClick={onShare}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-2 py-3 rounded-xl',
-            'bg-dark-800 hover:bg-dark-700',
-            'border border-sky-500/30',
-            'transition-all duration-200',
-            'text-sm font-medium text-dark-200'
-          )}
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-cyan-400/30 bg-cyan-400/10 py-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-400/15"
         >
-          <Share2 className="w-4 h-4" />
-          <span>Share Result</span>
+          <Share2 className="h-4 w-4" />
+          <span>Share Access</span>
         </button>
-        <a
-          href={`https://sepolia.etherscan.io/tx/${requestId}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            'flex items-center justify-center gap-2 px-4 py-3 rounded-xl',
-            'bg-dark-800 hover:bg-dark-700',
-            'border border-sky-500/30',
-            'transition-all duration-200',
-            'text-sm font-medium text-dark-200'
-          )}
-        >
-          <ExternalLink className="w-4 h-4" />
-        </a>
+        {txUrl && (
+          <a
+            href={txUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-slate-300 transition hover:border-cyan-400/50 hover:text-white"
+            aria-label="View transaction"
+          >
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        )}
       </div>
     </div>
   );

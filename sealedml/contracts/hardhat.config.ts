@@ -1,7 +1,7 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-ethers";
 import "@nomicfoundation/hardhat-chai-matchers";
-import "hardhat-deploy";
+import "@cofhe/hardhat-plugin";
 import "solidity-coverage";
 import "hardhat-gas-reporter";
 import * as dotenv from "dotenv";
@@ -40,22 +40,16 @@ const config: HardhatUserConfig = {
       url: ETHEREUM_SEPOLIA_RPC,
       chainId: 11155111,
       accounts: [PRIVATE_KEY],
-      live: true,
-      saveDeployments: true,
     },
     arbitrumSepolia: {
       url: ARBITRUM_SEPOLIA_RPC,
       chainId: 421614,
       accounts: [PRIVATE_KEY],
-      live: true,
-      saveDeployments: true,
     },
     baseSepolia: {
       url: BASE_SEPOLIA_RPC,
       chainId: 84532,
       accounts: [PRIVATE_KEY],
-      live: true,
-      saveDeployments: true,
     },
     localhost: {
       url: "http://127.0.0.1:8545",
@@ -67,17 +61,15 @@ const config: HardhatUserConfig = {
     tests: "./test",
     cache: "./cache",
     artifacts: "./artifacts",
-    deploy: "./scripts",
-  },
-  namedAccounts: {
-    deployer: {
-      default: 0,
-    },
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS === "true",
     currency: "USD",
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
+  },
+  cofhe: {
+    logMocks: process.env.COFHE_LOG_MOCKS === "true",
+    gasWarning: true,
   },
   verify: {
     etherscan: {
