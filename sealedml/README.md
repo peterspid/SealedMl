@@ -308,10 +308,12 @@ Final score is floored, capped to 0-100, and classified on-chain.
 - Institution authentication for lender workflows
 - Batch inference and batch verification
 - Multiple model families, including fraud detection and risk assessment models
-- Private reputation history and cross-chain identity
+- DeFi lending protocol integrations, including Aave/Compound-style connectors
+- Compliance workflows for KYC, regulatory reporting, and privacy-preserving audit trails
+- Private reputation history and cross-chain identity, including bridge attestations and multi-chain verification
 - Analytics layer for usage and health metrics without privacy leakage
-- Private AI marketplace and governance for community models
-- B2B API, webhooks, and integration documentation
+- Private AI marketplace with model uploads, model governance, and community submissions
+- B2B API with REST endpoints, webhooks, and rate-limited institutional access
 
 ---
 
@@ -461,33 +463,6 @@ NEXT_PUBLIC_ACCESS_CONTROL_ETH=0x...
 3. **Deterministic logic** - Model logic is versioned
 4. **Permissioned access** - Results controlled by user
 5. **No privacy bottlenecks** - Off-chain services never touch raw data
-
----
-
-## Future Vision
-
-### Wave 5 Roadmap
-
-1. **🌐 Private AI Marketplace**
-  - Upload and run private models
-  - Model versioning and governance
-  - Community model submissions
-2. **🏦 DeFi Integration**
-  - Direct lending protocol connectors
-  - Aave, Compound integration
-  - Automated collateral assessment
-3. **📜 Compliance Layer**
-  - KYC without revealing identity
-  - Regulatory reporting
-  - Audit trails without data exposure
-4. **🔗 Cross-chain Identity**
-  - Same score usable across chains
-  - Bridge attestation
-  - Multi-chain verification
-5. **🤝 B2B API**
-  - REST API for institutions
-  - Webhook notifications
-  - Rate-limited access
 
 ---
 
