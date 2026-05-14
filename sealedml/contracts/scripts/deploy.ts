@@ -1,86 +1,78 @@
-import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { DeployFunction } from "hardhat-deploy/types";
+import { ethers, network } from "hardhat";
 
-const deploySealedMLContracts: DeployFunction = async function (
-  hre: HardhatRuntimeEnvironment
-) {
-  const { deployments, getNamedAccounts, network } = hre;
-  const { deploy, execute } = deployments;
-  const { deployer } = await getNamedAccounts();
+async function deployContract(name: string, args: unknown[] = []) {
+  const factory = await ethers.getContractFactory(name);
+  const contract = await factory.deploy(...args);
+  await contract.waitForDeployment();
+
+  const address = await contract.getAddress();
+  const deploymentTx = contract.deploymentTransaction();
+  console.log(`${name} deployed at: ${address}`);
+  if (deploymentTx) {
+    console.log(`${name} tx: ${deploymentTx.hash}`);
+  }
+
+  return contract;
+}
+
+async function waitForTx(label: string, txPromise: Promise<{ wait: () => Promise<unknown> }>) {
+  const tx = await txPromise;
+  await tx.wait();
+  console.log(label);
+}
+
+async function main() {
+  const [deployer] = await ethers.getSigners();
+  const deployerAddress = await deployer.getAddress();
 
   console.log(`Deploying SealedML contracts to ${network.name}...`);
-  console.log(`Deployer: ${deployer}`);
+  console.log(`Deployer: ${deployerAddress}`);
 
-  // Deploy ModelRegistry
-  const modelRegistry = await deploy("ModelRegistry", {
-    from: deployer,
-    args: [],
-    log: true,
-    autoMine: true,
-  });
-  console.log(`ModelRegistry deployed at: ${modelRegistry.address}`);
+  const modelRegistry = await deployContract("ModelRegistry");
+  const resultManager = await deployContract("ResultManager");
 
-  // Deploy SealedMLInference
-  const sealedMLInference = await deploy("SealedMLInference", {
-    from: deployer,
-    args: [modelRegistry.address],
-    log: true,
-    autoMine: true,
-  });
-  console.log(`SealedMLInference deployed at: ${sealedMLInference.address}`);
+  const modelRegistryAddress = await modelRegistry.getAddress();
+  const resultManagerAddress = await resultManager.getAddress();
+  const sealedMLInference = await deployContract("SealedMLInference", [
+    modelRegistryAddress,
+    resultManagerAddress,
+  ]);
+  const sealedMLInferenceAddress = await sealedMLInference.getAddress();
 
-  // Deploy ResultManager
-  const resultManager = await deploy("ResultManager", {
-    from: deployer,
-    args: [],
-    log: true,
-    autoMine: true,
-  });
-  console.log(`ResultManager deployed at: ${resultManager.address}`);
+  await waitForTx(
+    "Result recorder configured",
+    resultManager.setResultRecorder(sealedMLInferenceAddress)
+  );
 
-  // Deploy AccessControl
-  const accessControl = await deploy("AccessControl", {
-    from: deployer,
-    args: [],
-    log: true,
-    autoMine: true,
-  });
-  console.log(`AccessControl deployed at: ${accessControl.address}`);
+  const accessControl = await deployContract("AccessControl");
+  const accessControlAddress = await accessControl.getAddress();
 
-  // Initialize model with weights
-  // Financial scoring model: income, repayment history, liabilities, savings, consistency, activity
-  // Weights tuned for credit risk assessment
   const featureWeights = [
-    15,   // income factor (positive)
-    25,   // repayment history (strong positive)
-    -20,  // current liabilities (negative)
-    10,   // savings behavior (positive)
-    15,   // transaction consistency (positive)
-    5,    // wallet activity (positive)
+    -2,   // income factor lowers risk
+    -3,   // repayment history lowers risk
+    6,    // current liabilities raise risk
+    -2,   // savings behavior lowers risk
+    -2,   // transaction consistency lowers risk
+    -1,   // wallet activity lowers risk
   ];
-  const bias = 50;  // Base score
+  const bias = 70;
   const decimals = 1;
-
-  // Risk thresholds (0-100 scale)
-  const lowRiskMax = 70;
-  const mediumRiskMax = 85;
+  const lowRiskMax = 40;
+  const mediumRiskMax = 70;
   const highRiskMax = 100;
 
-  console.log("Initializing model with weights...");
-  await execute(
-    "SealedMLInference",
-    { from: deployer, autoMine: true },
-    "initializeModel",
-    featureWeights,
-    bias,
-    decimals,
-    lowRiskMax,
-    mediumRiskMax,
-    highRiskMax
+  await waitForTx(
+    "Model initialized successfully",
+    sealedMLInference.initializeModel(
+      featureWeights,
+      bias,
+      decimals,
+      lowRiskMax,
+      mediumRiskMax,
+      highRiskMax
+    )
   );
-  console.log("Model initialized successfully");
 
-  // Register the model
   const featureSchema = [
     { name: "income_level", decimals: 1, minValue: 0, maxValue: 100, isRequired: true },
     { name: "repayment_history", decimals: 1, minValue: 0, maxValue: 100, isRequired: true },
@@ -90,51 +82,36 @@ const deploySealedMLContracts: DeployFunction = async function (
     { name: "wallet_activity", decimals: 1, minValue: 0, maxValue: 100, isRequired: true },
   ];
 
-  console.log("Registering model in ModelRegistry...");
-  await execute(
-    "ModelRegistry",
-    { from: deployer, autoMine: true },
-    "registerModel",
-    "Credit Risk Scoring v1",
-    "1.0.0",
-    6,  // featureCount
-    0,  // outputType: score
-    "Privacy-preserving credit risk scoring model using encrypted financial data",
-    sealedMLInference.address,
-    featureSchema
+  await waitForTx(
+    "Model registered successfully",
+    modelRegistry.registerModel(
+      "Credit Risk Scoring v1.1",
+      "1.1.0",
+      6,
+      0,
+      "Privacy-preserving credit risk scoring model using encrypted financial data with bounded on-chain inputs",
+      sealedMLInferenceAddress,
+      featureSchema
+    )
   );
-  console.log("Model registered successfully");
 
-  // Activate the model
-  console.log("Activating model...");
-  await execute(
-    "ModelRegistry",
-    { from: deployer, autoMine: true },
-    "activateModel",
-    0  // modelId
-  );
-  console.log("Model activated successfully");
+  await waitForTx("Model activated successfully", modelRegistry.activateModel(0));
 
-  // Grant permissions to ResultManager for AccessControl
-  await execute(
-    "AccessControl",
-    { from: deployer, autoMine: true },
-    "grantPermission",
-    resultManager.address,
-    2  // Decrypt level
+  await waitForTx(
+    "Permissions granted to ResultManager",
+    accessControl.grantPermission(resultManagerAddress, 2)
   );
-  console.log("Permissions granted to ResultManager");
 
   console.log("\n=== Deployment Summary ===");
   console.log(`Network: ${network.name}`);
-  console.log(`ModelRegistry: ${modelRegistry.address}`);
-  console.log(`SealedMLInference: ${sealedMLInference.address}`);
-  console.log(`ResultManager: ${resultManager.address}`);
-  console.log(`AccessControl: ${accessControl.address}`);
+  console.log(`ModelRegistry: ${modelRegistryAddress}`);
+  console.log(`SealedMLInference: ${sealedMLInferenceAddress}`);
+  console.log(`ResultManager: ${resultManagerAddress}`);
+  console.log(`AccessControl: ${accessControlAddress}`);
   console.log("==========================\n");
-};
+}
 
-deploySealedMLContracts.tags = ["SealedML", "ModelRegistry", "SealedMLInference", "ResultManager", "AccessControl"];
-deploySealedMLContracts.dependencies = [];
-
-export default deploySealedMLContracts;
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

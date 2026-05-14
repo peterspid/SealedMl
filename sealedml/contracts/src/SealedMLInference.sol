@@ -2,53 +2,67 @@
 pragma solidity ^0.8.25;
 
 import "@fhenixprotocol/cofhe-contracts/FHE.sol";
+import {InEuint8, InEuint16} from "@fhenixprotocol/cofhe-contracts/ICofhe.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+interface IResultManager {
+    function storeResult(
+        bytes32 requestId,
+        address owner,
+        uint256 scoreReference,
+        uint256 riskClassReference,
+        uint256 validityPeriod,
+        string calldata metadata
+    ) external;
+
+    function grantPermissionFromRecorder(
+        bytes32 requestId,
+        address owner,
+        address recipient,
+        uint256 duration
+    ) external;
+}
+
 /**
  * @title SealedMLInference
- * @dev Main inference engine for privacy-preserving ML inference using FHE.
- *      Performs weighted scoring on encrypted financial features.
- *      Results are encrypted and can only be decrypted by the result owner.
+ * @dev Main inference engine for privacy-preserving ML inference using CoFHE.
+ *      Accepts verifier-signed encrypted inputs, computes a bounded weighted
+ *      score on ciphertexts, and stores encrypted result handles for the user.
  */
 contract SealedMLInference is Ownable, ReentrancyGuard {
     using FHE for euint8;
     using FHE for euint16;
-    using FHE for euint32;
-    using FHE for euint64;
     using FHE for euint128;
-    using FHE for eaddress;
     using FHE for ebool;
 
-    // Model weights for encrypted inference (trained off-chain)
+    uint256 public constant FEATURE_MAX = 100;
+    uint256 public constant DEFAULT_RESULT_VALIDITY = 30 days;
+
     struct ModelWeights {
         int256[] featureWeights;
         int256 bias;
         uint8 decimals;
     }
 
-    // Risk thresholds for classification
     struct RiskThresholds {
         uint256 lowRiskMax;
         uint256 mediumRiskMax;
         uint256 highRiskMax;
     }
 
-    // State
     ModelWeights public modelWeights;
     RiskThresholds public riskThresholds;
     address public modelRegistry;
+    address public resultManager;
     bool public isInitialized;
 
-    // Request tracking
     uint256 public inferenceCount;
     mapping(bytes32 => bool) public processedRequests;
-
-    // Store encrypted results by requestId for decryption
+    mapping(bytes32 => address) public requestOwners;
     mapping(bytes32 => euint128) public encryptedResults;
     mapping(bytes32 => euint128) public encryptedRiskClasses;
 
-    // Events
     event InferenceRequested(
         address indexed user,
         bytes32 indexed requestId,
@@ -57,19 +71,28 @@ contract SealedMLInference is Ownable, ReentrancyGuard {
     event InferenceCompleted(
         bytes32 indexed requestId,
         uint256 encryptedScore,
-        uint8 riskClass,
+        uint256 encryptedRiskClass,
         uint256 timestamp
     );
     event ModelUpdated(uint256 timestamp);
     event ThresholdsUpdated(uint256 timestamp);
+    event ResultManagerUpdated(address indexed resultManager);
+    event ResultAccessGranted(
+        bytes32 indexed requestId,
+        address indexed owner,
+        address indexed recipient,
+        uint256 duration
+    );
 
-    constructor(address _modelRegistry) Ownable(msg.sender) {
+    constructor(address _modelRegistry, address _resultManager) Ownable(msg.sender) {
+        require(_modelRegistry != address(0), "Invalid model registry");
+        require(_resultManager != address(0), "Invalid result manager");
         modelRegistry = _modelRegistry;
-        isInitialized = false;
+        resultManager = _resultManager;
     }
 
     /**
-     * @notice Initialize the model with weights and thresholds
+     * @notice Initialize or replace the active scoring model.
      */
     function initializeModel(
         int256[] calldata weights,
@@ -80,8 +103,10 @@ contract SealedMLInference is Ownable, ReentrancyGuard {
         uint256 highRiskMax
     ) external onlyOwner {
         require(weights.length > 0, "Weights required");
+        require(decimals <= 6, "Decimals too large");
         require(lowRiskMax <= mediumRiskMax, "Invalid thresholds");
         require(mediumRiskMax <= highRiskMax, "Invalid thresholds");
+        require(highRiskMax <= FEATURE_MAX, "Score max too high");
 
         modelWeights = ModelWeights({
             featureWeights: weights,
@@ -99,8 +124,14 @@ contract SealedMLInference is Ownable, ReentrancyGuard {
         emit ModelUpdated(block.timestamp);
     }
 
+    function setResultManager(address _resultManager) external onlyOwner {
+        require(_resultManager != address(0), "Invalid result manager");
+        resultManager = _resultManager;
+        emit ResultManagerUpdated(_resultManager);
+    }
+
     /**
-     * @notice Update risk thresholds
+     * @notice Update risk thresholds.
      */
     function updateThresholds(
         uint256 lowRiskMax,
@@ -120,201 +151,189 @@ contract SealedMLInference is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Run encrypted inference on financial features using euint8 input type.
-     *         Computes weighted sum entirely on encrypted data using FHE.
-     * @param encryptedFeatures Array of encrypted feature values
-     * @param requestId Unique request identifier to prevent replay
-     * @return encryptedScoreRef Reference handle for the encrypted score
-     * @return riskClass The computed risk class (0=low, 1=medium, 2=high)
+     * @notice Run encrypted inference using verifier-signed uint8 inputs from the CoFHE SDK.
      */
     function runInference(
-        euint8[] memory encryptedFeatures,
+        InEuint8[] memory encryptedFeatures,
         bytes32 requestId
-    ) external nonReentrant returns (uint256 encryptedScoreRef, uint8 riskClass) {
-        require(isInitialized, "Model not initialized");
-        require(!processedRequests[requestId], "Request already processed");
-        require(
-            encryptedFeatures.length == modelWeights.featureWeights.length,
-            "Feature count mismatch"
-        );
+    ) external nonReentrant returns (uint256 encryptedScoreRef, uint256 encryptedRiskClassRef) {
+        require(encryptedFeatures.length == modelWeights.featureWeights.length, "Feature count mismatch");
 
-        processedRequests[requestId] = true;
-        inferenceCount++;
-
-        emit InferenceRequested(msg.sender, requestId, block.timestamp);
-
-        // Run encrypted weighted sum using euint128 for calculations
-        euint128 weightedSum = FHE.asEuint128(0);
-
+        euint128[] memory features = new euint128[](encryptedFeatures.length);
         for (uint256 i = 0; i < encryptedFeatures.length; i++) {
-            euint128 feature = FHE.asEuint128(encryptedFeatures[i]);
-
-            if (modelWeights.featureWeights[i] >= 0) {
-                uint256 weight = uint256(modelWeights.featureWeights[i]);
-                euint128 weightVal = FHE.asEuint128(weight);
-                euint128 product = FHE.mul(feature, weightVal);
-                weightedSum = FHE.add(weightedSum, product);
-            } else {
-                uint256 absWeight = uint256(-modelWeights.featureWeights[i]);
-                euint128 weightVal = FHE.asEuint128(absWeight);
-                euint128 product = FHE.mul(feature, weightVal);
-                weightedSum = FHE.sub(weightedSum, product);
-            }
+            euint8 feature = FHE.asEuint8(encryptedFeatures[i]);
+            features[i] = _capFeature(FHE.asEuint128(feature));
         }
 
-        // Add bias
-        if (modelWeights.bias >= 0) {
-            euint128 biasVal = FHE.asEuint128(uint256(modelWeights.bias));
-            weightedSum = FHE.add(weightedSum, biasVal);
-        } else {
-            euint128 biasVal = FHE.asEuint128(uint256(-modelWeights.bias));
-            weightedSum = FHE.sub(weightedSum, biasVal);
-        }
-
-        // Scale by decimals
-        euint128 encryptedScore;
-        if (modelWeights.decimals > 0) {
-            uint256 scaleFactor = 10 ** modelWeights.decimals;
-            euint128 scale = FHE.asEuint128(scaleFactor);
-            encryptedScore = FHE.div(weightedSum, scale);
-        } else {
-            encryptedScore = weightedSum;
-        }
-
-        // Store encrypted result for later decryption
-        encryptedResults[requestId] = encryptedScore;
-
-        // Determine risk class using encrypted comparison
-        euint128 lowThreshold = FHE.asEuint128(riskThresholds.lowRiskMax);
-        ebool isLowRisk = FHE.lte(encryptedScore, lowThreshold);
-
-        euint128 medThreshold = FHE.asEuint128(riskThresholds.mediumRiskMax);
-        ebool isMedOrLow = FHE.lte(encryptedScore, medThreshold);
-
-        // Encrypted risk class: 0=low, 1=medium, 2=high
-        euint128 encRiskClass = FHE.asEuint128(2);
-        encRiskClass = FHE.select(isMedOrLow, FHE.asEuint128(1), encRiskClass);
-        encRiskClass = FHE.select(isLowRisk, FHE.asEuint128(0), encRiskClass);
-
-        // Store encrypted risk class
-        encryptedRiskClasses[requestId] = encRiskClass;
-
-        // Allow the caller to access their encrypted result for decryption
-        FHE.allow(encryptedScore, msg.sender);
-        FHE.allow(encRiskClass, msg.sender);
-
-        // Return reference + plaintext riskClass for UI (actual class is in encryptedRiskClasses)
-        // The encrypted version will be decrypted off-chain
-        emit InferenceCompleted(requestId, uint256(euint128.unwrap(encryptedScore)), 0, block.timestamp);
-
-        return (uint256(euint128.unwrap(encryptedScore)), 0);
+        return _runInference(features, requestId, "sealedml:v1.1:credit-risk");
     }
 
     /**
-     * @notice Run inference with uint16 features for more precision
+     * @notice Run encrypted inference using verifier-signed uint16 inputs for future model precision.
      */
     function runInferenceUint16(
-        euint16[] memory encryptedFeatures,
+        InEuint16[] memory encryptedFeatures,
         bytes32 requestId
-    ) external nonReentrant returns (uint256 encryptedScoreRef, uint8 riskClass) {
-        require(isInitialized, "Model not initialized");
-        require(!processedRequests[requestId], "Request already processed");
-        require(
-            encryptedFeatures.length == modelWeights.featureWeights.length,
-            "Feature count mismatch"
+    ) external nonReentrant returns (uint256 encryptedScoreRef, uint256 encryptedRiskClassRef) {
+        require(encryptedFeatures.length == modelWeights.featureWeights.length, "Feature count mismatch");
+
+        euint128[] memory features = new euint128[](encryptedFeatures.length);
+        for (uint256 i = 0; i < encryptedFeatures.length; i++) {
+            euint16 feature = FHE.asEuint16(encryptedFeatures[i]);
+            features[i] = _capFeature(FHE.asEuint128(feature));
+        }
+
+        return _runInference(features, requestId, "sealedml:v1.1:credit-risk:uint16");
+    }
+
+    /**
+     * @notice Grant another wallet CoFHE decrypt access to this result and record
+     *         the app-level verification window in ResultManager.
+     */
+    function grantResultAccess(
+        bytes32 requestId,
+        address recipient,
+        uint256 duration
+    ) external nonReentrant {
+        require(processedRequests[requestId], "Request not processed");
+        require(requestOwners[requestId] == msg.sender, "Not request owner");
+        require(recipient != address(0), "Invalid recipient");
+        require(recipient != msg.sender, "Cannot share with self");
+        require(duration > 0, "Invalid duration");
+
+        FHE.allow(encryptedResults[requestId], recipient);
+        FHE.allow(encryptedRiskClasses[requestId], recipient);
+
+        IResultManager(resultManager).grantPermissionFromRecorder(
+            requestId,
+            msg.sender,
+            recipient,
+            duration
         );
 
+        emit ResultAccessGranted(requestId, msg.sender, recipient, duration);
+    }
+
+    function _runInference(
+        euint128[] memory encryptedFeatures,
+        bytes32 requestId,
+        string memory metadata
+    ) internal returns (uint256 encryptedScoreRef, uint256 encryptedRiskClassRef) {
+        require(isInitialized, "Model not initialized");
+        require(requestId != bytes32(0), "Invalid request ID");
+        require(!processedRequests[requestId], "Request already processed");
+        require(encryptedFeatures.length == modelWeights.featureWeights.length, "Feature count mismatch");
+
         processedRequests[requestId] = true;
+        requestOwners[requestId] = msg.sender;
         inferenceCount++;
 
         emit InferenceRequested(msg.sender, requestId, block.timestamp);
 
-        // Run encrypted weighted sum
-        euint128 weightedSum = FHE.asEuint128(0);
+        (euint128 encryptedScore, euint128 encryptedRiskClass) = _computeScore(encryptedFeatures);
+
+        encryptedResults[requestId] = encryptedScore;
+        encryptedRiskClasses[requestId] = encryptedRiskClass;
+
+        FHE.allowThis(encryptedScore);
+        FHE.allowThis(encryptedRiskClass);
+        FHE.allowSender(encryptedScore);
+        FHE.allowSender(encryptedRiskClass);
+
+        encryptedScoreRef = uint256(euint128.unwrap(encryptedScore));
+        encryptedRiskClassRef = uint256(euint128.unwrap(encryptedRiskClass));
+
+        IResultManager(resultManager).storeResult(
+            requestId,
+            msg.sender,
+            encryptedScoreRef,
+            encryptedRiskClassRef,
+            DEFAULT_RESULT_VALIDITY,
+            metadata
+        );
+
+        emit InferenceCompleted(
+            requestId,
+            encryptedScoreRef,
+            encryptedRiskClassRef,
+            block.timestamp
+        );
+
+        return (encryptedScoreRef, encryptedRiskClassRef);
+    }
+
+    function _computeScore(
+        euint128[] memory encryptedFeatures
+    ) internal returns (euint128 encryptedScore, euint128 encryptedRiskClass) {
+        uint256 scaleFactor = 10 ** modelWeights.decimals;
+
+        euint128 positiveSum = FHE.asEuint128(0);
+        euint128 negativeSum = FHE.asEuint128(0);
+
+        if (modelWeights.bias >= 0) {
+            positiveSum = FHE.add(
+                positiveSum,
+                FHE.asEuint128(uint256(modelWeights.bias) * scaleFactor)
+            );
+        } else {
+            negativeSum = FHE.add(
+                negativeSum,
+                FHE.asEuint128(uint256(-modelWeights.bias) * scaleFactor)
+            );
+        }
 
         for (uint256 i = 0; i < encryptedFeatures.length; i++) {
-            euint128 feature = FHE.asEuint128(encryptedFeatures[i]);
+            int256 signedWeight = modelWeights.featureWeights[i];
+            uint256 absWeight = signedWeight >= 0 ? uint256(signedWeight) : uint256(-signedWeight);
+            euint128 product = FHE.mul(encryptedFeatures[i], FHE.asEuint128(absWeight));
 
-            if (modelWeights.featureWeights[i] >= 0) {
-                uint256 weight = uint256(modelWeights.featureWeights[i]);
-                euint128 weightVal = FHE.asEuint128(weight);
-                euint128 product = FHE.mul(feature, weightVal);
-                weightedSum = FHE.add(weightedSum, product);
+            if (signedWeight >= 0) {
+                positiveSum = FHE.add(positiveSum, product);
             } else {
-                uint256 absWeight = uint256(-modelWeights.featureWeights[i]);
-                euint128 weightVal = FHE.asEuint128(absWeight);
-                euint128 product = FHE.mul(feature, weightVal);
-                weightedSum = FHE.sub(weightedSum, product);
+                negativeSum = FHE.add(negativeSum, product);
             }
         }
 
-        // Add bias
-        if (modelWeights.bias >= 0) {
-            euint128 biasVal = FHE.asEuint128(uint256(modelWeights.bias));
-            weightedSum = FHE.add(weightedSum, biasVal);
-        } else {
-            euint128 biasVal = FHE.asEuint128(uint256(-modelWeights.bias));
-            weightedSum = FHE.sub(weightedSum, biasVal);
+        ebool canSubtract = FHE.gte(positiveSum, negativeSum);
+        euint128 rawScore = FHE.select(
+            canSubtract,
+            FHE.sub(positiveSum, negativeSum),
+            FHE.asEuint128(0)
+        );
+
+        if (scaleFactor > 1) {
+            rawScore = FHE.div(rawScore, FHE.asEuint128(scaleFactor));
         }
 
-        // Scale by decimals
-        euint128 encryptedScore;
-        if (modelWeights.decimals > 0) {
-            uint256 scaleFactor = 10 ** modelWeights.decimals;
-            euint128 scale = FHE.asEuint128(scaleFactor);
-            encryptedScore = FHE.div(weightedSum, scale);
-        } else {
-            encryptedScore = weightedSum;
-        }
+        euint128 maxScore = FHE.asEuint128(riskThresholds.highRiskMax);
+        encryptedScore = FHE.select(
+            FHE.gte(rawScore, maxScore),
+            maxScore,
+            rawScore
+        );
 
-        // Store encrypted result
-        encryptedResults[requestId] = encryptedScore;
+        ebool isLowRisk = FHE.lte(encryptedScore, FHE.asEuint128(riskThresholds.lowRiskMax));
+        ebool isMediumOrLow = FHE.lte(encryptedScore, FHE.asEuint128(riskThresholds.mediumRiskMax));
 
-        // Determine risk class
-        euint128 lowThreshold = FHE.asEuint128(riskThresholds.lowRiskMax);
-        ebool isLowRisk = FHE.lte(encryptedScore, lowThreshold);
-
-        euint128 medThreshold = FHE.asEuint128(riskThresholds.mediumRiskMax);
-        ebool isMedOrLow = FHE.lte(encryptedScore, medThreshold);
-
-        euint128 encRiskClass = FHE.asEuint128(2);
-        encRiskClass = FHE.select(isMedOrLow, FHE.asEuint128(1), encRiskClass);
-        encRiskClass = FHE.select(isLowRisk, FHE.asEuint128(0), encRiskClass);
-
-        encryptedRiskClasses[requestId] = encRiskClass;
-
-        FHE.allow(encryptedScore, msg.sender);
-        FHE.allow(encRiskClass, msg.sender);
-
-        emit InferenceCompleted(requestId, uint256(euint128.unwrap(encryptedScore)), 0, block.timestamp);
-
-        return (uint256(euint128.unwrap(encryptedScore)), 0);
+        encryptedRiskClass = FHE.asEuint128(2);
+        encryptedRiskClass = FHE.select(isMediumOrLow, FHE.asEuint128(1), encryptedRiskClass);
+        encryptedRiskClass = FHE.select(isLowRisk, FHE.asEuint128(0), encryptedRiskClass);
     }
 
-    /**
-     * @notice Get the encrypted score reference for a completed inference.
-     *         Used by the frontend SDK to decrypt the result.
-     * @param requestId The unique request identifier
-     * @return The encrypted score as a uint256 handle for decryption
-     */
+    function _capFeature(euint128 feature) internal returns (euint128) {
+        return FHE.min(feature, FHE.asEuint128(FEATURE_MAX));
+    }
+
     function getEncryptedScore(bytes32 requestId) external view returns (uint256) {
         require(processedRequests[requestId], "Request not processed");
         return uint256(euint128.unwrap(encryptedResults[requestId]));
     }
 
-    /**
-     * @notice Get the encrypted risk class reference for a completed inference.
-     * @param requestId The unique request identifier
-     * @return The encrypted risk class as a uint256 handle for decryption
-     */
     function getEncryptedRiskClass(bytes32 requestId) external view returns (uint256) {
         require(processedRequests[requestId], "Request not processed");
         return uint256(euint128.unwrap(encryptedRiskClasses[requestId]));
     }
 
-    /**
-     * @notice Get model info
-     */
     function getModelInfo() external view returns (
         int256[] memory weights,
         int256 bias,
@@ -333,9 +352,6 @@ contract SealedMLInference is Ownable, ReentrancyGuard {
         );
     }
 
-    /**
-     * @notice Get inference count
-     */
     function getInferenceCount() external view returns (uint256) {
         return inferenceCount;
     }

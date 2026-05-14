@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useChainId, useReadContract } from 'wagmi';
-import { getContractAddresses } from '@/lib/contracts';
+import { getContractAddresses, hasConfiguredDeployment } from '@/lib/contracts';
 import { useAppStore } from '@/lib/store';
 
 const MODEL_REGISTRY_ABI = [
@@ -34,7 +34,7 @@ const MODEL_REGISTRY_ABI = [
   }
 ] as const;
 
-// Default features for the demo
+// Active v1 feature schema mirrored for the form while on-chain metadata loads.
 export const DEFAULT_FEATURES = [
   {
     name: 'income_level',
@@ -90,23 +90,24 @@ export function useModelInfo() {
   const chainId = useChainId();
   const { setModelInfo } = useAppStore();
   const addresses = getContractAddresses(chainId);
+  const configuredAddresses = hasConfiguredDeployment(addresses) ? addresses : null;
 
   const { data: activeModelId, isLoading: isLoadingModelId } = useReadContract({
-    address: addresses.modelRegistry as `0x${string}`,
+    address: configuredAddresses?.modelRegistry as `0x${string}` | undefined,
     abi: MODEL_REGISTRY_ABI,
     functionName: 'activeModelId',
     query: {
-      enabled: addresses.modelRegistry !== '0x0000000000000000000000000000000000000000',
+      enabled: Boolean(configuredAddresses),
     },
   });
 
   const { data: modelInfo, isLoading: isLoadingModel } = useReadContract({
-    address: addresses.modelRegistry as `0x${string}`,
+    address: configuredAddresses?.modelRegistry as `0x${string}` | undefined,
     abi: MODEL_REGISTRY_ABI,
     functionName: 'getModel',
     args: [BigInt(activeModelId || 0)],
     query: {
-      enabled: addresses.modelRegistry !== '0x0000000000000000000000000000000000000000' && activeModelId !== undefined,
+      enabled: Boolean(configuredAddresses) && activeModelId !== undefined,
     },
   });
 

@@ -1,81 +1,72 @@
 'use client';
 
-import { useAccount, useConnect, useDisconnect, useChainId, useBalance } from 'wagmi';
+import { useAccount, useBalance, useConnect, useDisconnect } from 'wagmi';
+import { formatUnits } from 'viem';
+import { useHydrated } from '@/hooks/useHydrated';
 import { formatAddress } from '@/lib/utils';
-import { cn } from '@/lib/utils';
-import { useEffect } from 'react';
+import { LogOut, Plug, Wallet } from 'lucide-react';
 
 export function ConnectWallet() {
+  const hydrated = useHydrated();
   const { address, isConnected, isConnecting } = useAccount();
   const { connect, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
-  const chainId = useChainId();
   const { data: balance } = useBalance({ address });
+  const primaryConnector = connectors[0];
 
-  useEffect(() => {
-    const event = new CustomEvent('walletConnectionChange', {
-      detail: { isConnected, address, chainId }
-    });
-    window.dispatchEvent(event);
-  }, [isConnected, address, chainId]);
+  if (!hydrated) {
+    return (
+      <button
+        type="button"
+        disabled
+        className="inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-cyan-950/50 opacity-60"
+      >
+        <Plug className="h-4 w-4" />
+        Connect
+      </button>
+    );
+  }
 
   if (isConnected && address) {
     return (
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {balance && (
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-dark-900/50 border border-sky-500/20">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-sm text-dark-200">
-              {Number(balance.formatted).toFixed(4)} {balance.symbol}
-            </span>
+          <div className="hidden rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-300 sm:block">
+            {Number(formatUnits(balance.value, balance.decimals)).toFixed(3)} {balance.symbol}
           </div>
         )}
-
         <button
+          type="button"
           onClick={() => disconnect()}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2 rounded-lg',
-            'bg-gradient-to-r from-sky-500 to-sky-600',
-            'hover:from-sky-400 hover:to-sky-500',
-            'transition-all duration-200 font-medium text-white text-sm shadow-lg shadow-sky-500/20'
-          )}
+          className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-800"
+          title="Disconnect wallet"
         >
-          <div className="w-2 h-2 rounded-full bg-emerald-400" />
+          <span className="h-2 w-2 rounded-full bg-emerald-400" />
           <span>{formatAddress(address)}</span>
+          <LogOut className="hidden h-4 w-4 text-slate-400 sm:block" />
         </button>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-2">
-      {connectors.map((connector) => (
-        <button
-          key={connector.uid}
-          onClick={() => connect({ connector })}
-          disabled={isPending || isConnecting}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2 rounded-lg',
-            'bg-gradient-to-r from-sky-500 to-sky-600',
-            'hover:from-sky-400 hover:to-sky-500',
-            'transition-all duration-200 font-medium text-white text-sm',
-            'shadow-lg shadow-sky-500/20',
-            'disabled:opacity-50 disabled:cursor-not-allowed'
-          )}
-        >
-          {isPending || isConnecting ? (
-            <>
-              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <span>Connecting...</span>
-            </>
-          ) : (
-            <span>Connect Wallet</span>
-          )}
-        </button>
-      ))}
-    </div>
+    <button
+      type="button"
+      onClick={() => primaryConnector && connect({ connector: primaryConnector })}
+      disabled={!primaryConnector || isPending || isConnecting}
+      className="inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-cyan-950/50 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {isPending || isConnecting ? (
+        <>
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+          Connecting
+        </>
+      ) : (
+        <>
+          {primaryConnector ? <Wallet className="h-4 w-4" /> : <Plug className="h-4 w-4" />}
+          Connect
+        </>
+      )}
+    </button>
   );
 }

@@ -16,3 +16,5 @@ typechain-types/
 deployments/
 *.log
 .DS_Store
+
+.vercel
